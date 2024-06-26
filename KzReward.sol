@@ -3,11 +3,15 @@ pragma solidity ^0.8.10;
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "./helpers/MerkleProof.sol";
 import "./helpers/SafeTransfer.sol";
 
-contract KzReward is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeable {
+contract KzReward is
+    Initializable,
+    OwnableUpgradeable,
+    ReentrancyGuardUpgradeable
+{
     uint96 public constant PERCENTAGE_BASE = 1000;
 
     address public rewardToken;
@@ -16,10 +20,19 @@ contract KzReward is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeab
     mapping(address => mapping(uint => bool)) public claimed; //user > session > status
     mapping(address => bool) public isManager;
 
-    event Claimed(address indexed sender, uint256 indexed session, uint256 amount, uint256 actualAmount);
+    event Claimed(
+        address indexed sender,
+        uint256 indexed session,
+        uint256 amount,
+        uint256 actualAmount
+    );
     event TakenBack(address token, address receiver, uint256 amount);
     event ManagerUpdated(address manager, bool status);
-    event RootProofUpdated(uint session, bytes32 rootProof, bool isRemovePrevious);
+    event RootProofUpdated(
+        uint session,
+        bytes32 rootProof,
+        bool isRemovePrevious
+    );
     event RateUpdated(uint96 amount);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -40,15 +53,15 @@ contract KzReward is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeab
         _;
     }
 
-    function getInitializedVersion() external view returns (uint8) {
-        return _getInitializedVersion();
-    }
-
     function deplete(address _token, address _receiver) external {
         takeBack(_token, _receiver, IERC20(_token).balanceOf(address(this)));
     }
 
-    function takeBack(address _token, address _receiver, uint _amount) public onlyOwner {
+    function takeBack(
+        address _token,
+        address _receiver,
+        uint _amount
+    ) public onlyOwner {
         SafeTransfer.safeTransfer(_token, _receiver, _amount);
         emit TakenBack(_token, _receiver, _amount);
     }
@@ -68,7 +81,11 @@ contract KzReward is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeab
         emit RootProofUpdated(_session, _merkleRoot, false);
     }
 
-    function claim(uint256 _session, uint256 _amount, bytes32[] calldata _merkleProof) external nonReentrant {
+    function claim(
+        uint256 _session,
+        uint256 _amount,
+        bytes32[] calldata _merkleProof
+    ) external nonReentrant {
         address sender = _msgSender();
         _checkAndMark(sender, _session, _amount, _merkleProof);
         uint256 actualAmount = (_amount * conversionRate) / PERCENTAGE_BASE;
@@ -83,12 +100,20 @@ contract KzReward is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeab
     ) external nonReentrant {
         address sender = _msgSender();
         uint256 len = _sessions.length;
-        require(len == _amounts.length && len == _merkleProofs.length, "INVALID_DATA");
+        require(
+            len == _amounts.length && len == _merkleProofs.length,
+            "INVALID_DATA"
+        );
         uint256 totalAmount;
         for (uint256 i; i < len; ) {
             _checkAndMark(sender, _sessions[i], _amounts[i], _merkleProofs[i]);
             totalAmount += _amounts[i];
-            emit Claimed(sender, _sessions[i], _amounts[i], (_amounts[i] * conversionRate) / PERCENTAGE_BASE);
+            emit Claimed(
+                sender,
+                _sessions[i],
+                _amounts[i],
+                (_amounts[i] * conversionRate) / PERCENTAGE_BASE
+            );
             unchecked {
                 ++i;
             }
@@ -98,7 +123,12 @@ contract KzReward is Initializable, OwnableUpgradeable, ReentrancyGuardUpgradeab
         SafeTransfer.safeTransfer(rewardToken, sender, actualAmount);
     }
 
-    function _checkAndMark(address _sender, uint _session, uint256 _amount, bytes32[] calldata _merkleProof) internal {
+    function _checkAndMark(
+        address _sender,
+        uint _session,
+        uint256 _amount,
+        bytes32[] calldata _merkleProof
+    ) internal {
         bytes32 node;
         bytes32 root;
         /// @solidity memory-safe-assembly
